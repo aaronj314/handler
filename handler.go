@@ -89,7 +89,7 @@ func getFromMultipartForm(r *http.Request) *RequestOptions {
 		variablesStr := r.PostFormValue("variables")
 
 		if err := json.Unmarshal([]byte(variablesStr), &variables); err != nil {
-			fmt.Printf(err)
+			fmt.Println(err)
 		}
 
 		fieldName := variables["input"].(map[string]interface{})["fieldName"]
