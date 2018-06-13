@@ -10,12 +10,15 @@ import (
 	"github.com/graphql-go/graphql"
 
 	"context"
+	"fmt"
+	"bytes"
 )
 
 const (
 	ContentTypeJSON           = "application/json"
 	ContentTypeGraphQL        = "application/graphql"
 	ContentTypeFormURLEncoded = "application/x-www-form-urlencoded"
+	ContentTypeMultipartFormData = "multipart/form-data"
 )
 
 type Handler struct {
@@ -48,6 +51,34 @@ func getFromForm(values url.Values) *RequestOptions {
 			Query:         query,
 			Variables:     variables,
 			OperationName: values.Get("operationName"),
+		}
+	}
+
+	return nil
+}
+
+func getFromMultipartForm(r *http.Request) *RequestOptions {
+	query := r.PostFormValue("query")
+	if query != "" {
+		variables := make(map[string]interface{})
+
+		file, _, err := r.FormFile("variables")
+
+		if err != nil {
+			fmt.Println(err)
+			return nil
+		}
+		defer file.Close()
+
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(file)
+		err = json.Unmarshal(buf.Bytes(), &variables)
+
+
+		return &RequestOptions{
+			Query:         query,
+			Variables:     variables,
+			OperationName: r.PostFormValue("operationName"),
 		}
 	}
 
@@ -93,6 +124,15 @@ func NewRequestOptions(r *http.Request) *RequestOptions {
 
 		return &RequestOptions{}
 
+	case ContentTypeMultipartFormData:
+		if err := r.ParseMultipartForm(4096); err != nil {
+			return &RequestOptions{}
+		}
+
+		if reqOpt := getFromMultipartForm(r); reqOpt != nil {
+			return reqOpt
+		}
+		return &RequestOptions{}
 	case ContentTypeJSON:
 		fallthrough
 	default:
