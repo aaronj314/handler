@@ -12,6 +12,10 @@ import (
 	"context"
 	"fmt"
 	"bytes"
+	"os"
+	"io"
+	"path"
+	"github.com/satori/go.uuid"
 )
 
 const (
@@ -62,17 +66,57 @@ func getFromMultipartForm(r *http.Request) *RequestOptions {
 	if query != "" {
 		variables := make(map[string]interface{})
 
-		file, _, err := r.FormFile("variables")
+		vars, _, err := r.FormFile("variables")
 
 		if err != nil {
 			fmt.Println(err)
 			return nil
 		}
-		defer file.Close()
+		defer vars.Close()
 
 		buf := new(bytes.Buffer)
-		buf.ReadFrom(file)
+		buf.ReadFrom(vars)
 		err = json.Unmarshal(buf.Bytes(), &variables)
+
+		if err != nil {
+			fmt.Println(err)
+			return nil
+		}
+
+		input := variables["input"].(map[string]interface{})
+
+		fieldName := input["fieldName"].(string)
+
+		file, _, err := r.FormFile(fieldName)
+
+		if err != nil {
+			fmt.Println(err)
+			return nil
+		}
+
+		defer file.Close()
+
+		cwd, _ := os.Getwd()
+		tmp := path.Join(cwd, "tmp")
+		if _, err := os.Stat(tmp); os.IsNotExist(err) {
+			os.Mkdir(tmp, 0766)
+		}
+
+		u, _ := uuid.NewV4()
+
+		bufferFile := tmp+"/"+u.String()
+
+		input["buffer"]=bufferFile
+
+		f, err := os.OpenFile(bufferFile, os.O_WRONLY|os.O_CREATE, 0666)
+		if err != nil {
+			fmt.Println(err)
+			return nil
+		}
+
+		defer f.Close()
+
+		io.Copy(f, file)
 
 
 		return &RequestOptions{
