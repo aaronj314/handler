@@ -11,7 +11,6 @@ import (
 
 	"context"
 	"fmt"
-	"bytes"
 	"os"
 	"io"
 	"path"
@@ -65,29 +64,37 @@ func getFromMultipartForm(r *http.Request) *RequestOptions {
 	query := r.PostFormValue("query")
 	if query != "" {
 		variables := make(map[string]interface{})
+		//
+		//vars, _, err := r.FormFile("variables")
+		//
+		//if err != nil {
+		//	fmt.Println(err)
+		//	return nil
+		//}
+		//defer vars.Close()
+		//
+		//buf := new(bytes.Buffer)
+		//buf.ReadFrom(vars)
+		//err = json.Unmarshal(buf.Bytes(), &variables)
+		//
+		//if err != nil {
+		//	fmt.Println(err)
+		//	return nil
+		//}
 
-		vars, _, err := r.FormFile("variables")
+		//input := variables["input"].(map[string]interface{})
+		// fieldName := input["fieldName"].(string)
+		//
+		// variables as text not a file of type json
+		variablesStr := r.PostFormValue("variables")
 
-		if err != nil {
-			fmt.Println(err)
-			return nil
+		if err := json.Unmarshal([]byte(variablesStr), &variables); err != nil {
+			fmt.Printf(err)
 		}
-		defer vars.Close()
 
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(vars)
-		err = json.Unmarshal(buf.Bytes(), &variables)
+		fieldName := variables["input"].(map[string]interface{})["fieldName"]
 
-		if err != nil {
-			fmt.Println(err)
-			return nil
-		}
-
-		input := variables["input"].(map[string]interface{})
-
-		fieldName := input["fieldName"].(string)
-
-		file, _, err := r.FormFile(fieldName)
+		file, _, err := r.FormFile(fieldName.(string))
 
 		if err != nil {
 			fmt.Println(err)
@@ -106,7 +113,8 @@ func getFromMultipartForm(r *http.Request) *RequestOptions {
 
 		bufferFile := tmp+"/"+u.String()
 
-		input["buffer"]=bufferFile
+		//input["buffer"]=bufferFile
+		variables["input"].(map[string]interface{})["buffer"] = bufferFile
 
 		f, err := os.OpenFile(bufferFile, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
